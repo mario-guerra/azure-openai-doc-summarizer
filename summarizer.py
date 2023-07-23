@@ -7,15 +7,6 @@ import re
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 
-# Define the default prompt
-# default_prompt = """
-# Analyze the content you are given and provide an executive summary of the content. The summary should include all information necessary for an executive to act upon.
-# Ignore any extraneous information that is not relevant to an executive, including personal information, small talk, jokes, etcetera.
-# As new content is given to you, revise the entire summary to include the new content. Be concise and complete. Focus on important details and key takeaways.
-# If the content is a chat transcript, start the summary with a list of attendees as bullet points.
-# If the content is a document, start the summary with the title of the document. If no title is present in the document, provide one based on the content summary.
-# Do not include any extraneous information in the summary that is not part of the content. Only focus on the content itself.
-# """
 default_prompt = """
 Summarize content concisely for executive action, including important details.
 Update with new information.
@@ -60,13 +51,18 @@ async def process_text(input_text):
 
 
 async def summarize_document(input_path, output_path):
-    chunk_size = 3000
+    chunk_size = 20000
     previous_summary = None
+    total_characters = 0  # Initialize the total characters count
+    summarized_characters = 0  # Initialize the summarized characters count
 
     if os.path.exists(output_path):
         os.remove(output_path)
 
     with open(input_path, "r") as f:
+        total_characters = len(f.read())  # Get the total characters count
+        f.seek(0)  # Reset the file pointer to the beginning
+
         with open(output_path, "w") as out_f:
             while True:
                 print("Summarizing...")
@@ -75,17 +71,16 @@ async def summarize_document(input_path, output_path):
                 if not chunk:
                     break
 
-                if previous_summary:
-                    # Compress the existing summary
-                    # compressed_summary = await process_text(previous_summary, output_path, None, prompt)
+                # Update the summarized characters count
+                summarized_characters += len(chunk)
+                # Display current progress
+                print(f"Progress: {summarized_characters}/{total_characters}")
 
-                    # Combine the compressed summary with the input chunk
-                    # input_text = str(compressed_summary) + "\n\n" + chunk
+                if previous_summary:
                     input_text = str(previous_summary) + "\n\n" + chunk
                 else:
                     input_text = chunk
 
-                # Perform summarization using the combined input
                 summary = await process_text(input_text)
 
                 if summary:
@@ -94,7 +89,6 @@ async def summarize_document(input_path, output_path):
                 else:
                     print("No summary generated for the current chunk.")
 
-            # Write the final summary to the output file
             if previous_summary:
                 out_f.write(str(previous_summary))
 
@@ -104,7 +98,6 @@ async def summarize_document(input_path, output_path):
 parser = argparse.ArgumentParser(description="Document Summarizer")
 parser.add_argument("input_path", help="Path to the input text file")
 parser.add_argument("output_path", help="Path to the output summary file")
-parser.add_argument("-p", "--prompt", help="An alternative prompt (optional)")
 
 args = parser.parse_args()
 
