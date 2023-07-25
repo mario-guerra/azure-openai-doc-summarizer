@@ -29,8 +29,6 @@ deployment, api_key, endpoint = sk.azure_openai_settings_from_dot_env()
 summary_service = AzureChatCompletion(deployment, endpoint, api_key)
 
 # Function to create a summary using the Azure Chat Completion service
-
-
 async def create_summary(input):
     messages = [("system", default_prompt), ("user", input)]
     reply = await summary_service.complete_chat_async(messages=messages, request_settings=ChatRequestSettings(temperature=0.7, top_p=0.8, max_tokens=2000))
@@ -40,8 +38,6 @@ async def create_summary(input):
 encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
 
 # Function to estimate the token count of a given text
-
-
 def estimate_token_count(text):
     tokens = encoding.encode(text)
     length = len(tokens)
@@ -56,8 +52,6 @@ max_tokens = int(
 chunk_size = min(max_tokens * 4, 10000)
 
 # Function to extract text from a PDF file
-
-
 def extract_text_from_pdf(pdf_path):
     with open(pdf_path, "rb") as file:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -68,8 +62,6 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 # Function to process text and handle rate limit errors with retries
-
-
 async def process_text(input_text):
     MAX_RETRIES = 3
     retry_count = 0
@@ -92,22 +84,16 @@ async def process_text(input_text):
     raise Exception("Rate limit error. All retries failed.")
 
 # Function to write paragraphs to the output file
-
-
 def write_paragraphs(out_f, paragraphs):
     for p in paragraphs:
         out_f.write(p + "\n\n")
 
 # Function to extract summary paragraphs from the summary text
-
-
 def extract_summary_paragraphs(summary_text):
     paragraphs = str(summary_text).split('\n\n')
     return [p.strip() for p in paragraphs]
 
 # Function to summarize a document asynchronously
-
-
 async def summarize_document(input_path, output_path):
     max_context_paragraphs = 3
     previous_summary_paragraphs = []
