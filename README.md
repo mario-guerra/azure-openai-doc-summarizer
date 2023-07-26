@@ -1,6 +1,6 @@
-# Document Summarizer with Azure OpenAI
+# Doc Summarizer with Azure OpenAI
 
-Document Summarizer is a Python script that uses Azure OpenAI GPT models to generate rich summaries of text files (including meeting transcripts), PDFs, and Word documents.
+Doc Summarizer is a Python script that uses Azure OpenAI GPT models to generate rich summaries of text files (including meeting transcripts), PDFs, and Word documents.
 
 The script processes the input document in chunks of 10,000 characters, iterating on the summary in several passes using a sliding content window for the context. I experimented with different chunk sizes and 10k seemed to be a sweet spot that produces good summarizes without sacrificing useful information. A larger context size (20k for example) forces the model to use more brevity to stay within the constraints of the model token limits. 
 
