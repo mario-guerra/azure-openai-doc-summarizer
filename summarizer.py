@@ -8,6 +8,7 @@ import docx
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.connectors.ai.chat_request_settings import ChatRequestSettings
+from semantic_kernel.connectors.ai.ai_exception import AIException
 
 # Dictionary containing the maximum token limits for different GPT models
 model_max_tokens = {
@@ -86,23 +87,35 @@ def extract_text_from_word(doc_path):
 async def process_text(input_text):
     MAX_RETRIES = 3
     retry_count = 0
+    TIMEOUT_DELAY = 5  # Adjust the delay as needed
 
     while retry_count < MAX_RETRIES:
-        summary = await create_summary(input_text)
-        if "exceeded token rate limit" in str(summary):
-            error_message = str(summary)
-            delay_str = re.search(r'Please retry after (\d+)', error_message)
-            if delay_str:
-                delay = int(delay_str.group(1))
-                print(f"Rate limit exceeded. Retrying in {delay} seconds...")
-                await asyncio.sleep(delay)
+        try:
+            summary = await create_summary(input_text)
+            if "exceeded token rate limit" in str(summary):
+                error_message = str(summary)
+                delay_str = re.search(r'Please retry after (\d+)', error_message)
+                if delay_str:
+                    delay = int(delay_str.group(1))
+                    print(f"Rate limit exceeded. Retrying in {delay} seconds...")
+                    await asyncio.sleep(delay)
+                    retry_count += 1
+                else:
+                    raise Exception("Unknown error message when processing text.")
+            else:
+                return summary
+        except AIException as e:
+            if "Request timed out" in str(e):
+                print(f"Timeout error occurred. Retrying in {TIMEOUT_DELAY} seconds...")
+                await asyncio.sleep(TIMEOUT_DELAY)
                 retry_count += 1
             else:
-                raise Exception("Unknown error message when processing text.")
+                raise
+    if retry_count == MAX_RETRIES:
+        if "Request timed out" in str(e):
+            raise Exception("Timeout error. All retries failed.")
         else:
-            return summary
-
-    raise Exception("Rate limit error. All retries failed.")
+            raise Exception("Rate limit error. All retries failed.")
 
 # Write paragraphs to the output file
 def write_paragraphs(out_f, paragraphs):
