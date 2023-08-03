@@ -1,6 +1,6 @@
 # Doc Summarizer with Azure OpenAI
 
-Doc Summarizer is a Python script that uses Azure OpenAI GPT models to generate rich summaries of text files (including meeting transcripts), PDFs, and Word documents.
+Doc Summarizer is a Python script that uses Azure OpenAI GPT models to generate rich summaries of text files (including meeting transcripts), PDFs, Word documents, and websites.
 
 The script processes the input document in chunks of 10,000 characters, iterating on the summary in several passes using a sliding content window for the context. I experimented with different chunk sizes and 10k seemed to be a sweet spot that produces good summarizes without sacrificing useful information. A larger context size (20k for example) forces the model to use more brevity to stay within the constraints of the model token limits. 
 
@@ -16,7 +16,7 @@ The sliding content window consists of the most recent paragraphs from the previ
 
 You can install the required libraries using pip:
 
-`pip install semantic_kernel tiktoken PyPDF2 python-docx`
+`pip install semantic_kernel tiktoken PyPDF2 python-docx requests beautifulsoup4 lxml`
 
 _Note: The `semantic_kernel` library is not a standard library and might not be available through pip. If so, the package can be found [here](https://aka.ms/sk/pypi)_
 
@@ -49,10 +49,12 @@ The input document can be a plain text file or a PDF document. The script automa
 
 python summarizer.py <input_path> <output_path>
 
-Replace `<input_path>` with the path to the input text file or PDF document, and `<output_path>` with the path to the output summary file.
+Replace `<input_path>` with the path to the input file (text, PDF, Word) or URL, and `<output_path>` with the path to the output summary file.
 
-Example:
+Examples:
 
-python summarizer.py input.pdf summary.txt
+`python summarizer.py input.pdf text_summary.txt`
 
-This command will generate a summary of the `input.pdf` document and save it in the `summary.txt` file.
+`python summarizer.py https://example.com/no-one-reads-long-articles-anymore.html url_summary.txt`
+
+These commands will generate a summary of the input document or URL and save it in the `*_summary.txt`* file.
