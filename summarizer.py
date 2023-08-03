@@ -5,6 +5,8 @@ import re
 import tiktoken
 import PyPDF2
 import docx
+import requests
+from bs4 import BeautifulSoup
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.connectors.ai.chat_request_settings import ChatRequestSettings
@@ -78,6 +80,14 @@ def extract_text_from_word(doc_path):
         text += paragraph.text + "\n"
     return text
 
+# Extract text from a URL
+def extract_text_from_url(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.content, "html.parser")
+    text = soup.get_text(separator="\n")
+    return text
+
 # Process text and handle ChatGPT rate limit errors with retries. Rate limit errors
 # are passed as a string in the summary text rather than thrown as an exception, which
 # is why we need to check for the error message in the summary text. If a rate limit
@@ -137,14 +147,17 @@ async def summarize_document(input_path, output_path):
         os.remove(output_path)
 
     # Check the input file type and extract text accordingly
-    file_extension = input_path.lower().split('.')[-1]
-    if file_extension == "pdf":
-        input_text = extract_text_from_pdf(input_path)
-    elif file_extension == "docx":
-        input_text = extract_text_from_word(input_path)
+    if input_path.lower().startswith("http"):
+        input_text = extract_text_from_url(input_path)
     else:
-        with open(input_path, "r") as f:
-            input_text = f.read()
+        file_extension = input_path.lower().split('.')[-1]
+        if file_extension == "pdf":
+            input_text = extract_text_from_pdf(input_path)
+        elif file_extension == "docx":
+            input_text = extract_text_from_word(input_path)
+        else:
+            with open(input_path, "r") as f:
+                input_text = f.read()
 
     total_chars = len(input_text)
 
