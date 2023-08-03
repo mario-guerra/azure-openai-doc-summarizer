@@ -93,7 +93,9 @@ def extract_text_from_url(url):
 # is why we need to check for the error message in the summary text. If a rate limit
 # error is encountered, the method will retry the request after the specified delay.
 # The delay is extracted from the error message, since it explicitly states how long
-#  to wait before a retry.
+# to wait before a retry.
+# There are also cases where the request times out wiating for the OpenAI model to
+# reply. Retry logic is added to handle those cases as well.
 async def process_text(input_text):
     MAX_RETRIES = 3
     retry_count = 0
@@ -186,7 +188,7 @@ async def summarize_document(input_path, output_path):
             # Update the previous summary paragraphs based on the new summary.
             # If the summary has more than max_context_paragraphs, remove the first
             # paragraph until the summary is within the limit. As paragraphs are removed,
-            # they are written to the output file.
+            # they are saved for writing to the output file.
             if summary:
                 summary_paragraphs = extract_summary_paragraphs(summary)
                 while len(summary_paragraphs) > max_context_paragraphs:
