@@ -33,7 +33,7 @@ The difference in models are tradeoffs between performance and speed. The gpt-4 
 
 The script works by reading the input document in chunks and generating a summary using the chat completion functionality of the GPT models from Azure OpenAI. It takes care of rate limits and retries when necessary.
 
-The input document can be a plain text file or a PDF document. The script automatically detects the input file type and extracts the text accordingly.
+The input content can be a plain text file, PDF, Word document, or website URL. The script automatically detects the input file type and extracts the text accordingly.
 
 ## Usage
 
