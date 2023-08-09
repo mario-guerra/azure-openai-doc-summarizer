@@ -1,10 +1,10 @@
 # Doc Summarizer with Azure OpenAI
 
-Doc Summarizer is a Python script that uses Azure OpenAI GPT models to generate rich summaries of text files (including meeting transcripts), PDFs, Word documents, and websites.
+Doc Summarizer is a Python script that uses Azure OpenAI models to generate rich summaries of large documents, including text files, PDFs, Word documents, and websites.
 
-The script processes the input document in chunks of 10,000 characters, iterating on the summary in several passes using a sliding content window for the context. I experimented with different chunk sizes and 10k seemed to be a sweet spot that produces good summarizes without sacrificing useful information. A larger context size (20k for example) forces the model to use more brevity to stay within the constraints of the model token limits. 
+The script processes the input document in chunks based on the selected summary level (verbose, concise, or terse), iterating on the summary using a sliding content window for the context. 
 
-The sliding content window consists of the most recent paragraphs from the previous summary, plus the current input text chunk. As summaries are produced, the oldest paragraphs in the summary are saved off and removed from the content window prior to the next summary iteration. This approach allows the script to iteratively summarize large text files without overflowing the model's token limits, while still retaining enough context between summarization steps to produce a cohesive summary of the entire document.
+The sliding content window consists of the most recent paragraphs from the previous summary, plus the current input text chunk. This approach allows the script to iteratively summarize large text files without overflowing the model's token limits, while still retaining enough context between summarization steps to produce a cohesive summary of the entire document.
 
 ## Dependencies
 
@@ -13,6 +13,9 @@ The sliding content window consists of the most recent paragraphs from the previ
 - tiktoken
 - PyPDF2
 - python-docx
+- requests
+- beautifulsoup4
+- lxml
 
 You can install the required libraries using pip:
 
@@ -23,7 +26,7 @@ _Note: The `semantic_kernel` library is not a standard library and might not be 
 ## Requirements
 
 An Azure OpenAI subscription is required to run this script, along with a deployment for one of the following models:
-- gpt-35-turbo
+- gpt-3.5-turbo
 - gpt-4
 - gpt-4-32k
 
@@ -31,9 +34,9 @@ The difference in models are tradeoffs between performance and speed. The gpt-4 
 
 ## Overview
 
-The script works by reading the input document in chunks and generating a summary using the chat completion functionality of the GPT models from Azure OpenAI. It takes care of rate limits and retries when necessary.
+The script reads the input document in chunks and uses the `AzureChatCompletion` connector from the [Semantic Kernel library](https://github.com/microsoft/semantic-kernel) to generate summaries. Token rate limit errors and timeouts are handled with retry logic. The final summary is written to the specified output file.
 
-The input content can be a plain text file, PDF, Word document, or website URL. The script automatically detects the input file type and extracts the text accordingly.
+The input document can be a plain text file, a PDF document, a Word document, or a URL. The script automatically detects the input file type and extracts the text accordingly.
 
 ## Usage
 
@@ -41,20 +44,20 @@ The input content can be a plain text file, PDF, Word document, or website URL. 
 
 2. Open a terminal and navigate to the folder containing the script file.
 
-3. Install the dependencies outlined above
+3. Install the dependencies outlined above.
 
 4. Change the name of '.env.example' to '.env' and add your Azure OpenAI deployment name, API key, and endpoint.
- 
+
 5. Run the script using the following command:
 
-python summarizer.py <input_path> <output_path>
+`python summarizer.py <input_path> <output_path> [--summary-level <summary_level>]`
 
-Replace `<input_path>` with the path to the input file (text, PDF, Word) or URL, and `<output_path>` with the path to the output summary file.
+Replace `<input_path>` with the path to the input file (text, PDF, Word) or URL, `<output_path>` with the path to the output summary file, and `<summary_level>` (optional) with one of the following options: "verbose", "concise", or "terse". If the `--summary-level` flag is not used, the default option is "concise".
 
 Examples:
 
 `python summarizer.py input.pdf text_summary.txt`
 
-`python summarizer.py https://example.com/no-one-reads-long-articles-anymore.html url_summary.txt`
+`python summarizer.py https://example.com/no-one-reads-long-articles-anymore.html url_summary.txt --summary-level terse`
 
 These commands will generate a summary of the input document or URL and save it in the `*_summary.txt`* file.
