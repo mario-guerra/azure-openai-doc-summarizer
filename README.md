@@ -44,7 +44,7 @@ The input document can be a plain text file, a PDF document, a Word document, or
 
 2. Open a terminal and navigate to the folder containing the script file.
 
-3. Install the dependencies outlined above.
+3. Install the dependencies outlined above using pip: `pip install semantic_kernel tiktoken PyPDF2 python-docx requests beautifulsoup4 lxml`
 
 4. Change the name of '.env.example' to '.env' and add your Azure OpenAI deployment name, API key, and endpoint.
 
