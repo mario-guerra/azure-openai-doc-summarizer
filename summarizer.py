@@ -33,7 +33,7 @@ from semantic_kernel.connectors.ai.chat_request_settings import ChatRequestSetti
 from semantic_kernel.connectors.ai.ai_exception import AIException
 
 # Dictionary defining chunk sizes, which influence verbosity of the chat model output.
-# The larger the chunk size, the more verbose the output. The chunk size is
+# The smaller the chunk size, the more verbose the output. The chunk size is
 # used to determine the number of characters to process in a given text during a
 # single request to the chat model.
 summary_levels = {
@@ -50,6 +50,11 @@ request_token_sizes = {
     "concise": 2000,
     "terse": 1000,
 }
+# Summary level and request token size are inversely related. The request tokens value sets an
+# upper limit on the number of tokens that can be requested from the model. By reducing the
+# input chunk size and increasing the request token size, we giving the model the leeway to be
+# more verbose while summarzing less text at a time. This allows the model to include more detail
+# in the summary, while still maintaining a reasonable summary length.
 
 summary_prompts = {
     "verbose": """Summarize verbosely, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
@@ -68,17 +73,6 @@ deployment, api_key, endpoint = sk.azure_openai_settings_from_dot_env()
 # Using the chat completion service for summarizing text. 
 # Initialize the summary service with the deployment, endpoint, and API key
 summary_service = AzureChatCompletion(deployment, endpoint, api_key)
-
-# Get the encoding model for token estimation. This is needed to estimate the number of tokens the
-# text chunk will take up, so that we can process the text in chunks that fit within the context window.
-# gpt-3.5-turbo uses the same encoding model as gpt-4, so we can use the same encoding model for token estimation.
-encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
-
-# Estimate the token count of a given text
-def estimate_token_count(text):
-    tokens = encoding.encode(text)
-    length = len(tokens)
-    return length
 
 # Define a method for creating a summary asynchronously. Each time this method is called,
 # a list of messages is created and seeded with the system prompt, along with the user input.
