@@ -6,6 +6,9 @@ The script processes the input document in chunks based on the selected summary 
 
 The sliding content window consists of the most recent paragraphs from the previous summary, plus the current input text chunk. This approach allows the script to iteratively summarize large text files without overflowing the model's token limits, while still retaining enough context between summarization steps to produce a cohesive summary of the entire document.
 
+Read more:
+[The Sliding Content Window: Document Summarization with Azure OpenAI](https://marioguerra.xyz/ai-document-summarization-with-sliding-content-window/)
+
 ## Dependencies
 
 - Python 3.6 or later
