@@ -22,7 +22,6 @@ import argparse
 import asyncio
 import os
 import re
-import tiktoken
 import PyPDF2
 import docx
 import requests
