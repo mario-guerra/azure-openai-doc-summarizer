@@ -39,6 +39,7 @@ summary_levels = {
     "verbose": 5000,
     "concise": 10000,
     "terse": 20000,
+    "barney": 5000,
 }
 
 # Dictionary defining request token sizes, which influence verbosity of the chat model output.
@@ -48,6 +49,7 @@ request_token_sizes = {
     "verbose": 3000,
     "concise": 2000,
     "terse": 1000,
+    "barney": 3000,
 }
 # Summary level and request token size are inversely related. The request tokens value sets an
 # upper limit on the number of tokens that can be requested from the model. By reducing the
@@ -56,9 +58,10 @@ request_token_sizes = {
 # in the summary, while still maintaining a reasonable summary length.
 
 summary_prompts = {
-    "verbose": """Summarize verbosely, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
-    "concise": """Summarize concisely, highlighting key details, and update with new info. Ignore irrelevant content, include all technical content. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
+    "verbose": """Summarize verbosely, emphasizing key details and action items, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
+    "concise": """Summarize concisely, highlighting key details and action items, update with new info. Ignore irrelevant content, include all technical content. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
     "terse": """Summarize tersely for executive action using [PREVIOUS_SUMMARY] and [CURRENT_CHUNK], focusing on key details and technical content. Retain the first two paragraphs of [PREVIOUS_SUMMARY], remove labels, and maintain paragraph breaks for readability. Avoid phrases like 'in conclusion' or 'in summary'.""",
+    "barney": """Break the content down Barney style, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
 }
 
 # Initialize the semantic kernel for use in getting settings from .env file.
@@ -196,7 +199,7 @@ async def summarize_document(input_path, output_path, summary_level):
         elif file_extension == "docx":
             input_text = extract_text_from_word(input_path)
         else:
-            with open(input_path, "r") as f:
+            with open(input_path, "r", encoding="utf-8") as f:
                 input_text = f.read()
 
     total_chars = len(input_text)
@@ -208,6 +211,7 @@ async def summarize_document(input_path, output_path, summary_level):
             print("Summarizing...")
             # Read a chunk of text from the input_text
             chunk = input_text[processed_chars:processed_chars+chunk_size]
+            #print("current chunk: ", chunk)
             processed_chars += len(chunk)
 
             # Break the loop if there's no more text to process
@@ -253,7 +257,7 @@ async def summarize_document(input_path, output_path, summary_level):
 parser = argparse.ArgumentParser(description="Document Summarizer")
 parser.add_argument("input_path", help="Path to the input text file")
 parser.add_argument("output_path", help="Path to the output summary file")
-parser.add_argument("--summary-level", choices=["verbose", "concise", "terse"],
+parser.add_argument("--summary-level", choices=["verbose", "concise", "terse", "barney"],
                     default="concise", help="Configure summary level, concise is default")
 
 # Parse command-line arguments
