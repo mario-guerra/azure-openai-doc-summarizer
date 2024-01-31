@@ -36,8 +36,8 @@ from semantic_kernel.connectors.ai.ai_exception import AIException
 # used to determine the number of characters to process in a given text during a
 # single request to the chat model.
 summary_levels = {
-    "verbose": 5000,
-    "concise": 10000,
+    "verbose": 20000,
+    "concise": 20000,
     "terse": 20000,
     "barney": 5000,
 }
@@ -46,8 +46,8 @@ summary_levels = {
 # The larger the request token size, the more verbose the output. The request token size is
 # used to determine the number of tokens to request from the chat model during a single request.
 request_token_sizes = {
-    "verbose": 3000,
-    "concise": 2000,
+    "verbose": 10000,
+    "concise": 5000,
     "terse": 1000,
     "barney": 3000,
 }
@@ -58,8 +58,8 @@ request_token_sizes = {
 # in the summary, while still maintaining a reasonable summary length.
 
 summary_prompts = {
-    "verbose": """Summarize verbosely, emphasizing key details and action items, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
-    "concise": """Summarize concisely, highlighting key details and action items, update with new info. Ignore irrelevant content, include all technical content. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
+    "verbose": """Summarize verbosely, emphasizing key details and action items, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'. Do not reference 'chunk' or 'chunks' in your summary. Collect all questions that were asked but require further follow up, as well as action items.""",
+    "concise": """Summarize concisely, highlighting key details and important points, update with new info. Extract and save all questions that were asked but require further follow up. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
     "terse": """Summarize tersely for executive action using [PREVIOUS_SUMMARY] and [CURRENT_CHUNK], focusing on key details and technical content. Retain the first two paragraphs of [PREVIOUS_SUMMARY], remove labels, and maintain paragraph breaks for readability. Avoid phrases like 'in conclusion' or 'in summary'.""",
     "barney": """Break the content down Barney style, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
 }
