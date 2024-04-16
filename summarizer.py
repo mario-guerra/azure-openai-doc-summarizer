@@ -40,6 +40,7 @@ summary_levels = {
     "concise": 20000,
     "terse": 20000,
     "barney": 5000,
+    "transcribe": 20000,
 }
 
 # Dictionary defining request token sizes, which influence verbosity of the chat model output.
@@ -50,6 +51,7 @@ request_token_sizes = {
     "concise": 5000,
     "terse": 1000,
     "barney": 3000,
+    "transcribe": 10000,
 }
 # Summary level and request token size are inversely related. The request tokens value sets an
 # upper limit on the number of tokens that can be requested from the model. By reducing the
@@ -58,10 +60,11 @@ request_token_sizes = {
 # in the summary, while still maintaining a reasonable summary length.
 
 summary_prompts = {
-    "verbose": """Summarize verbosely, emphasizing key details and action items, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'. Do not reference 'chunk' or 'chunks' in your summary. Collect all questions that were asked but require further follow up, as well as action items.""",
+    "verbose": """Summarize verbosely, emphasizing key details, action items, and described goals, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'. Do not reference 'chunk' or 'chunks' in your summary. Collect all questions that were asked but require further follow up, as well as action items.""",
     "concise": """Summarize concisely, highlighting key details and important points, update with new info. Extract and save all questions that were asked but require further follow up. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
     "terse": """Summarize tersely for executive action using [PREVIOUS_SUMMARY] and [CURRENT_CHUNK], focusing on key details and technical content. Retain the first two paragraphs of [PREVIOUS_SUMMARY], remove labels, and maintain paragraph breaks for readability. Avoid phrases like 'in conclusion' or 'in summary'.""",
     "barney": """Break the content down Barney style, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
+    "transcribe": """Convert the following transcript into a dialogue format, similar to a script in a novel. Please remove filler words like 'uh' and 'umm', lightly edit sentences for clarity and readability, and include all the details discussed in the conversation without abbreviating or summarizing any part of it. Incorporate new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability. Do not summarize or omit any details.""",
 }
 
 # Initialize the semantic kernel for use in getting settings from .env file.
@@ -85,8 +88,8 @@ summary_service = AzureChatCompletion(deployment, endpoint, api_key)
 # input text plus the system prompt tokens. The larger the chunk size, the fewer tokens
 # we can request from the model to fit within the context window. Therefore the model
 # will be less verbose with larger chunk sizes.
-async def create_summary(input, summary_level):
-    messages = [("system", summary_prompts[summary_level]), ("user", input)]
+async def create_summary(input, summary_level, custom_prompt):
+    messages = [("system", summary_prompts[summary_level] + " " + custom_prompt), ("user", input)]
     request_size = request_token_sizes[summary_level]
     reply = await summary_service.complete_chat_async(messages=messages,request_settings=ChatRequestSettings(temperature=0.4, top_p=0.4, max_tokens=request_size))
     return(reply)
@@ -123,16 +126,14 @@ def extract_text_from_url(url):
 # error is encountered, the method will retry the request after the specified delay.
 # The delay is extracted from the error message, since it explicitly states how long
 #  to wait before a retry.
-async def process_text(input_text, summary_level):
+async def process_text(input_text, summary_level, custom_prompt):
     MAX_RETRIES = 5
     retry_count = 0
     TIMEOUT_DELAY = 5  # Adjust the delay as needed
 
-    request_size = request_token_sizes[summary_level]
-
     while retry_count < MAX_RETRIES:
         try:
-            summary = await create_summary(input_text, summary_level)
+            summary = await create_summary(input_text, summary_level, custom_prompt)
             if "exceeded token rate limit" in str(summary):
                 error_message = str(summary)
                 delay_str = re.search(r'Please retry after (\d+)', error_message)
@@ -208,10 +209,9 @@ async def summarize_document(input_path, output_path, summary_level):
     with open(output_path, "a") as out_f:
         processed_chars = 0
         while True:
-            print("Summarizing...")
+            print("Processing...")
             # Read a chunk of text from the input_text
             chunk = input_text[processed_chars:processed_chars+chunk_size]
-            #print("current chunk: ", chunk)
             processed_chars += len(chunk)
 
             # Break the loop if there's no more text to process
@@ -219,12 +219,14 @@ async def summarize_document(input_path, output_path, summary_level):
                 break
 
             # Combine previous summary paragraphs and the current chunk
-            input_text_chunk = "[PREVIOUS_SUMMARY]\n\n" + "\n\n".join(
-                previous_summary_paragraphs) + "\n\n" + "[CURRENT_CHUNK]\n\n" + chunk
+            if summary_level == "transcribe":
+                input_text_chunk = chunk
+            else:
+                input_text_chunk = "[PREVIOUS_SUMMARY]\n\n" + "\n\n".join(
+                    previous_summary_paragraphs) + "\n\n" + "[CURRENT_CHUNK]\n\n" + chunk
 
             # Process the text chunk and generate a summary
-            summary_ctx = await process_text(input_text_chunk, summary_level)
-
+            summary_ctx = await process_text(input_text_chunk, summary_level, args.prompt)
             summary = str(summary_ctx)
 
             # Update the previous summary paragraphs based on the new summary.
@@ -247,18 +249,18 @@ async def summarize_document(input_path, output_path, summary_level):
                 f"\nProgress: {processed_chars}/{total_chars} ({progress:.2f}%)")
 
         # Write the remaining summary paragraphs to the output file
-        # write_paragraphs(out_f, previous_summary_paragraphs)
         while previous_summary_paragraphs:
             out_f.write(previous_summary_paragraphs.pop(0) + "\n\n")
             out_f.flush()
-    print("Summary complete!")
+    print("Process complete!")
 
 # Define command-line argument parser
 parser = argparse.ArgumentParser(description="Document Summarizer")
 parser.add_argument("input_path", help="Path to the input text file")
 parser.add_argument("output_path", help="Path to the output summary file")
-parser.add_argument("--summary-level", choices=["verbose", "concise", "terse", "barney"],
-                    default="concise", help="Configure summary level, concise is default")
+parser.add_argument("--summary-level", choices=["verbose", "concise", "terse", "barney", "transcribe"],
+                    default="verbose", help="Configure summary level, verbose is default")
+parser.add_argument("--prompt", default="", help="Add a custom prompt to the instructional prompt")
 
 # Parse command-line arguments
 args = parser.parse_args()
