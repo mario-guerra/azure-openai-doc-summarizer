@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Mario Guerra
+# Copyright (c) 2024 Mario Guerra
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,30 +22,28 @@ import argparse
 import asyncio
 import os
 import re
+import requests
 import PyPDF2
 import docx
-import requests
+from dotenv import load_dotenv
 from bs4 import BeautifulSoup
-import semantic_kernel as sk
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-from semantic_kernel.connectors.ai.chat_request_settings import ChatRequestSettings
-from semantic_kernel.connectors.ai.ai_exception import AIException
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from openai import AzureOpenAI
+
+# Load environment variables from .env file if needed
+# from dotenv import load_dotenv
+load_dotenv()
 
 # Dictionary defining chunk sizes, which influence verbosity of the chat model output.
-# The smaller the chunk size, the more verbose the output. The chunk size is
-# used to determine the number of characters to process in a given text during a
-# single request to the chat model.
 summary_levels = {
     "verbose": 20000,
     "concise": 20000,
     "terse": 20000,
     "barney": 5000,
-    "transcribe": 20000,
+    "transcribe": 10000,
 }
 
 # Dictionary defining request token sizes, which influence verbosity of the chat model output.
-# The larger the request token size, the more verbose the output. The request token size is
-# used to determine the number of tokens to request from the chat model during a single request.
 request_token_sizes = {
     "verbose": 10000,
     "concise": 5000,
@@ -53,46 +51,63 @@ request_token_sizes = {
     "barney": 3000,
     "transcribe": 10000,
 }
-# Summary level and request token size are inversely related. The request tokens value sets an
-# upper limit on the number of tokens that can be requested from the model. By reducing the
-# input chunk size and increasing the request token size, we giving the model the leeway to be
-# more verbose while summarzing less text at a time. This allows the model to include more detail
-# in the summary, while still maintaining a reasonable summary length.
 
 summary_prompts = {
     "verbose": """Summarize verbosely, emphasizing key details, action items, and described goals, while incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'. Do not reference 'chunk' or 'chunks' in your summary. Collect all questions that were asked but require further follow up, as well as action items.""",
     "concise": """Summarize concisely, highlighting key details and important points, update with new info. Extract and save all questions that were asked but require further follow up. Use [PREVIOUS_SUMMARY] and [CURRENT_CHUNK]. Keep first two paragraphs in [PREVIOUS_SUMMARY] as-is. Exclude these labels from summary. Ensure readability using paragraph breaks, and avoid phrases like 'in conclusion' or 'in summary'.""",
     "terse": """Summarize tersely for executive action using [PREVIOUS_SUMMARY] and [CURRENT_CHUNK], focusing on key details and technical content. Retain the first two paragraphs of [PREVIOUS_SUMMARY], remove labels, and maintain paragraph breaks for readability. Avoid phrases like 'in conclusion' or 'in summary'.""",
     "barney": """Break the content down Barney style, emphasizing key details and incorporating new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability, and avoid phrases like 'in conclusion' or 'in summary'.""",
-    "transcribe": """Convert the following transcript into a dialogue format, similar to a script in a novel. Please remove filler words like 'uh' and 'umm', lightly edit sentences for clarity and readability, and include all the details discussed in the conversation without abbreviating or summarizing any part of it. Incorporate new information from [CURRENT_CHUNK] into [PREVIOUS_SUMMARY]. Retain the first two paragraphs of [PREVIOUS_SUMMARY]. Remove labels, maintain paragraph breaks for readability. Do not summarize or omit any details.""",
+    "transcribe": """Convert the following transcript into a dialogue format, similar to a script in a novel. Please remove filler words like 'uh' and 'umm', lightly edit sentences for clarity and readability, and include all the details discussed in the conversation without abbreviating or summarizing any part of it. Maintain paragraph breaks for readability. Do not summarize or omit any details.""",
 }
 
-# Initialize the semantic kernel for use in getting settings from .env file.
-# I'm not using the semantic kernel pipeline for communicating with the GPT models,
-# I'm using the semantic kernel service connectors directly for simplicity.
-kernel = sk.Kernel()
+# Set up Azure OpenAI API key and endpoint
+api_key = os.getenv("AZURE_OPENAI_API_KEY")
+endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# Get deployment, API key, and endpoint from environment variables
-deployment, api_key, endpoint = sk.azure_openai_settings_from_dot_env()
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(),
+    "https://cognitiveservices.azure.com/.default"
+)
 
-# Using the chat completion service for summarizing text. 
-# Initialize the summary service with the deployment, endpoint, and API key
-summary_service = AzureChatCompletion(deployment, endpoint, api_key)
+client = AzureOpenAI(
+    azure_endpoint=endpoint,
+    azure_ad_token_provider=token_provider,
+    api_version="2024-05-01-preview",
+)
 
-# Define a method for creating a summary asynchronously. Each time this method is called,
-# a list of messages is created and seeded with the system prompt, along with the user input.
-# The user input consists of a portion of the previous summary, along with the current text chunk
-# being processed.
-#
-# The number of tokens requested from the model is based on the tokenized size of the
-# input text plus the system prompt tokens. The larger the chunk size, the fewer tokens
-# we can request from the model to fit within the context window. Therefore the model
-# will be less verbose with larger chunk sizes.
+# Define a method for creating a summary asynchronously.
 async def create_summary(input, summary_level, custom_prompt):
-    messages = [("system", summary_prompts[summary_level] + " " + custom_prompt), ("user", input)]
-    request_size = request_token_sizes[summary_level]
-    reply = await summary_service.complete_chat_async(messages=messages,request_settings=ChatRequestSettings(temperature=0.4, top_p=0.4, max_tokens=request_size))
-    return(reply)
+    token = token_provider()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+    data = {
+        "model": deployment,
+        "messages": [
+            {
+                "role": "user",
+                "content": summary_prompts[summary_level] + " " + custom_prompt + "\n" + input
+            }
+        ],
+        "max_tokens": request_token_sizes[summary_level],
+        "temperature": 0.4,
+        "top_p": 0.4,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+        "stop": None,
+        "stream": False
+    }
+
+    response = requests.post(
+        f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version=2024-05-01-preview",
+        headers=headers,
+        json=data
+    )
+
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 # Extract text from a PDF file
 def extract_text_from_pdf(pdf_path):
@@ -120,12 +135,7 @@ def extract_text_from_url(url):
     text = soup.get_text(separator="\n")
     return text
 
-# Process text and handle ChatGPT rate limit errors with retries. Rate limit errors
-# are passed as a string in the summary text rather than thrown as an exception, which
-# is why we need to check for the error message in the summary text. If a rate limit
-# error is encountered, the method will retry the request after the specified delay.
-# The delay is extracted from the error message, since it explicitly states how long
-#  to wait before a retry.
+# Process text and handle ChatGPT rate limit errors with retries.
 async def process_text(input_text, summary_level, custom_prompt):
     MAX_RETRIES = 5
     retry_count = 0
@@ -146,7 +156,7 @@ async def process_text(input_text, summary_level, custom_prompt):
                     raise Exception("Unknown error message when processing text.")
             else:
                 return summary
-        except AIException as e:
+        except requests.exceptions.RequestException as e:
             if "Request timed out" in str(e):
                 print(f"Timeout error occurred. Retrying in {TIMEOUT_DELAY} seconds...")
                 await asyncio.sleep(TIMEOUT_DELAY)
@@ -230,9 +240,6 @@ async def summarize_document(input_path, output_path, summary_level):
             summary = str(summary_ctx)
 
             # Update the previous summary paragraphs based on the new summary.
-            # If the summary has more than max_context_paragraphs, remove the first
-            # paragraph until the summary is within the limit. As paragraphs are removed,
-            # they are written to the output file.
             if summary:
                 summary_paragraphs = extract_summary_paragraphs(summary)
                 while len(summary_paragraphs) > max_context_paragraphs:
@@ -245,8 +252,7 @@ async def summarize_document(input_path, output_path, summary_level):
 
             # Calculate and display the progress of the summarization
             progress = (processed_chars / total_chars) * 100
-            print(
-                f"\nProgress: {processed_chars}/{total_chars} ({progress:.2f}%)")
+            print(f"\nProgress: {processed_chars}/{total_chars} ({progress:.2f}%)")
 
         # Write the remaining summary paragraphs to the output file
         while previous_summary_paragraphs:
@@ -267,6 +273,5 @@ args = parser.parse_args()
 
 # Run the summarization process
 if __name__ == "__main__":
-
     asyncio.run(summarize_document(
         args.input_path, args.output_path, summary_level=args.summary_level))
