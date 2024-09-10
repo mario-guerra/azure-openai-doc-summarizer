@@ -61,7 +61,6 @@ summary_prompts = {
 }
 
 # Set up Azure OpenAI API key and endpoint
-api_key = os.getenv("AZURE_OPENAI_API_KEY")
 endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
